@@ -1,0 +1,19 @@
+# This file lists the Python package dependencies required for new features or fixes addressed in recent issues.
+# Add new packages here following the format: package_name==version
+# Specify the exact version to ensure reproducible builds.
+# Include a brief comment explaining the reason for adding the package.
+# Install these dependencies using: pip install -r requirements.txt
+
+# Example: A new feature related to data processing required pandas
+# pandas==1.5.3
+
+# Example: Added for making HTTP requests to an external service
+# requests==2.28.2
+
+# Example: Needed for interacting with a database backend
+# SQLAlchemy==1.4.46
+
+# Example: For handling environment variables securely
+# python-dotenv==0.21.0
+
+# Add your new dependencies below this line:
