@@ -1,12 +1,21 @@
-// Greets the provided name with a "Hello" message.
-// Defaults to "world" when no name is given.
+/**
+ * Greets the provided name with a "Hello" message.
+ * Defaults to "world" when no name is given.
+ */
 export function hello(name: string = 'world'): string {
   return `Hello, ${name}!`;
 }
 
-// If this file is executed directly, greet the first command line argument or
-// use the default greeting.
-if (require.main === module) {
-  const [, , name] = process.argv;
+/**
+ * Runs the CLI using the provided arguments.
+ * The first argument is treated as the name to greet.
+ */
+export function main(args: string[] = process.argv.slice(2)): void {
+  const [name] = args;
   console.log(hello(name));
+}
+
+// If this file is executed directly, run the CLI.
+if (require.main === module) {
+  main();
 }
