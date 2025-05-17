@@ -6,6 +6,11 @@ on:
   issue_comment:
     types: [created]
 
+permissions:          # ← merge に必要
+  contents: write
+  pull-requests: write
+  issues: write
+
 jobs:
   judge:
     runs-on: ubuntu-latest
@@ -15,31 +20,34 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
 
-            async function listOpenPRs() {
-              const { data } = await github.rest.pulls.list({ owner, repo, state: 'open' });
-              return data;
-            }
+            /* ----- trigger 判定 ----- */
+            const body = github.event.comment?.body?.trim() ?? '';
+            const commentTrigger =
+              github.event_name === 'issue_comment' && body.startsWith('/judge');
 
-            const commentTrigger = github.event_name === 'issue_comment' && github.event.comment.body.trim() === startsWith('/judge');
-            const openPRs = await listOpenPRs();
-            const autoTrigger = github.event_name === 'pull_request' && openPRs.length >= 3;
+            const { data: openPRs } =
+              await github.rest.pulls.list({ owner, repo, state: 'open' });
+            const autoTrigger =
+              github.event_name === 'pull_request' && openPRs.length >= 3;
 
             if (!commentTrigger && !autoTrigger) {
               core.info('Judging conditions not met.');
               return;
             }
 
-            async function scorePR(pr) {
-              const { data: files } = await github.rest.pulls.listFiles({ owner, repo, pull_number: pr.number });
-              const stats = files.reduce((acc, f) => { return { additions: acc.additions + f.additions, deletions: acc.deletions + f.deletions }; }, { additions: 0, deletions: 0 });
-              return stats.additions + stats.deletions; // lower is better
-            }
+            /* ----- 採点 ----- */
+            const scored = await Promise.all(
+              openPRs.map(async pr => {
+                const { data: files } = await github.rest.pulls.listFiles({
+                  owner, repo, pull_number: pr.number
+                });
+                const total = files.reduce(
+                  (sum, f) => sum + f.additions + f.deletions, 0
+                );
+                return { pr, score: total };
+              })
+            );
 
-            const scored = [];
-            for (const pr of openPRs) {
-              const score = await scorePR(pr);
-              scored.push({ pr, score });
-            }
             if (scored.length === 0) {
               core.info('No open PRs.');
               return;
@@ -47,5 +55,16 @@ jobs:
 
             scored.sort((a, b) => a.score - b.score);
             const winner = scored[0].pr;
-            await github.rest.pulls.merge({ owner, repo, pull_number: winner.number, merge_method: 'squash' });
-            await github.rest.issues.createComment({ owner, repo, issue_number: winner.number, body: 'This PR was automatically judged as the best and merged.' });
+            core.info(`🏆 #${winner.number} wins (score=${scored[0].score})`);
+
+            try {
+              await github.rest.pulls.merge({
+                owner, repo, pull_number: winner.number, merge_method: 'squash'
+              });
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: winner.number,
+                body: 'This PR was automatically judged as the best and merged.'
+              });
+            } catch (err) {
+              core.setFailed(`❌ Failed to merge #${winner.number}: ${err.message}`);
+            }
