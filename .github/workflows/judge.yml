@@ -1,12 +1,11 @@
 name: Judge PRs
-
 on:
   pull_request:
     types: [opened, reopened, synchronize]
   issue_comment:
     types: [created]
 
-permissions:          # ← merge に必要
+permissions:
   contents: write
   pull-requests: write
   issues: write
@@ -20,22 +19,22 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
 
-            /* ----- trigger 判定 ----- */
-            const body = github.event.comment?.body?.trim() ?? '';
-            const commentTrigger =
-              github.event_name === 'issue_comment' && body.startsWith('/judge');
+            /* ===== trigger 判定 ===== */
+            const isIssueComment = context.eventName === 'issue_comment';
+            const body = isIssueComment ? (context.payload.comment?.body ?? '').trim() : '';
+            const commentTrigger = isIssueComment && body.startsWith('/judge');
 
             const { data: openPRs } =
               await github.rest.pulls.list({ owner, repo, state: 'open' });
             const autoTrigger =
-              github.event_name === 'pull_request' && openPRs.length >= 3;
+              context.eventName === 'pull_request' && openPRs.length >= 3;
 
             if (!commentTrigger && !autoTrigger) {
               core.info('Judging conditions not met.');
               return;
             }
 
-            /* ----- 採点 ----- */
+            /* ===== 採点 ===== */
             const scored = await Promise.all(
               openPRs.map(async pr => {
                 const { data: files } = await github.rest.pulls.listFiles({
@@ -47,7 +46,6 @@ jobs:
                 return { pr, score: total };
               })
             );
-
             if (scored.length === 0) {
               core.info('No open PRs.');
               return;
