@@ -20,7 +20,7 @@ jobs:
               return data;
             }
 
-            const commentTrigger = github.event_name === 'issue_comment' && github.event.comment.body.trim() === '/judge';
+            const commentTrigger = github.event_name === 'issue_comment' && github.event.comment.body.trim() === startsWith('/judge');
             const openPRs = await listOpenPRs();
             const autoTrigger = github.event_name === 'pull_request' && openPRs.length >= 3;
 
