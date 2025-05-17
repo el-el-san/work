@@ -51,18 +51,39 @@ jobs:
               return;
             }
 
+            /* ===== 勝敗決定 ===== */
             scored.sort((a, b) => a.score - b.score);
-            const winner = scored[0].pr;
+            const winner = scored[0].pr;          // 最小スコアを優勝とする
+            const losers = scored.slice(1).map(s => s.pr);  // それ以外は敗者
+
             core.info(`🏆 #${winner.number} wins (score=${scored[0].score})`);
 
+            /* ===== マージ ===== */
             try {
               await github.rest.pulls.merge({
                 owner, repo, pull_number: winner.number, merge_method: 'squash'
               });
               await github.rest.issues.createComment({
                 owner, repo, issue_number: winner.number,
-                body: 'This PR was automatically judged as the best and merged.'
+                body: 'This PR was automatically judged as the best and merged. 🎉'
               });
             } catch (err) {
               core.setFailed(`❌ Failed to merge #${winner.number}: ${err.message}`);
+              return;  // マージに失敗したら敗者を閉じずに終了
+            }
+
+            /* ===== 敗者を Close ===== */
+            for (const pr of losers) {
+              try {
+                await github.rest.pulls.update({
+                  owner, repo, pull_number: pr.number, state: 'closed'
+                });
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: pr.number,
+                  body: `Closed automatically because another PR (#${winner.number}) was merged.`
+                });
+                core.info(`Closed PR #${pr.number}`);
+              } catch (err) {
+                core.warning(`Could not close PR #${pr.number}: ${err.message}`);
+              }
             }
